@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8" />
+    <title>websocket</title>
+
+</head>
+<body onload="disconnect()">
+<noscript><h2 style="color: #ff0000">貌似你的浏览器不支持websocket</h2></noscript>
+<div>
+    <div>
+        <button id="connect" onclick="connect();">连接</button>
+        <button id="disconnect" disabled="disabled" onclick="disconnect();">断开连接</button>
+    </div>
+    <div id="conversationDiv">
+        <label>输入你想说的东西</label><input type="text" id="name" />
+        <button id="sendName" onclick="sendName();">发送</button>
+        <table id="tab">
+            <tr><td><p id="response"></p></td></tr>
+
+        </table>
+
+    </div>
+</div>
+<script src="js/sockjs.js"></script>
+<script src="js/stomp.js"></script>
+<script src="js/jquery-3.2.1.min.js"></script>
+<script type="text/javascript">
+    var stompClient = null;
+
+    function setConnected(connected) {
+        document.getElementById('connect').disabled = connected;
+        document.getElementById('disconnect').disabled = !connected;
+        document.getElementById('conversationDiv').style.visibility = connected ? 'visible' : 'hidden';
+        $('#response').html();
+    }
+
+    function connect() {
+        var socket = new SockJS('/endpointWisely'); //1
+        stompClient = Stomp.over(socket);//2
+        stompClient.connect({}, function(frame) {//3
+            setConnected(true);
+            console.log('开始进行连接Connected: ' + frame);
+            stompClient.subscribe('/topic/getResponse', function(respnose){ //4
+                showResponse(JSON.parse(respnose.body).responseMessage);
+            });
+        });
+    }
+
+
+    function disconnect() {
+        if (stompClient != null) {
+            stompClient.disconnect();
+        }
+        setConnected(false);
+        console.log("Disconnected");
+    }
+
+    function sendName() {
+        var name = $('#name').val();
+        stompClient.send("/welcome", {}, JSON.stringify({ 'name': name }));//5
+
+    }
+
+    function showResponse(message) {
+        var response = $("#response");
+        var trHTML = "<tr><td><p>"+message+"</p></td></tr>"
+        $("#tab").append(trHTML);
+    }
+
+
+    var heartCheck = {
+        timeout: 60000,//60ms
+        timeoutObj: null,
+        reset: function(){
+            clearTimeout(this.timeoutObj);
+            this.start();
+        },
+        start: function(){
+            this.timeoutObj = setTimeout(function(){
+                ws.send("HeartBeat");
+            }, this.timeout)
+        }
+    }
+    ws.onopen = function () {
+        heartCheck.start();
+    };
+    ws.onmessage = function (event) {
+        heartCheck.reset();
+    }
+</script>
+</body>
+</html>
